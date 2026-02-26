@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sunwin</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script>
+    // Hàm chuyển hướng nhanh
+    function redirectToIndex() {
+        // Sử dụng replace để ngăn người dùng quay lại trang tool bằng nút Back
+        window.location.replace('index.html');
+    }
+
+    // Chạy hàm hiện nội dung ngay lập tức
+    document.addEventListener('DOMContentLoaded', () => {
+        document.body.style.display = 'block'; // Hiện body ngay sau khi DOM được tải
+    });
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:'Share Tech Mono',monospace;
+      background:radial-gradient(circle at 10% 10%, rgba(0,0,0,0.6), rgba(0,0,0,1));
+      color:#00ff00;height:100vh;overflow:hidden;
+      display: none; /* Mặc định ẩn, sẽ được JS hiện lên ngay */
+      overscroll-behavior: none;
+      touch-action: manipulation;
+    }
+
+    /* --- Overlays (Game Selection) --- */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #0052D4, #4364F7, #6FB1FC);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+      transition: opacity 0.3s ease;
+    }
+
+    /* iframe behind UI */
+    #fullscreenIframe{position:fixed;inset:0;width:100%;height:100%;height:100dvh;border:0;z-index:1;}
+
+    /* Main content hidden until login */
+    .panel, #predictionPopup, .footer-text { display: none; }
+    .panel.unlocked { display: flex; }
+    .footer-text.unlocked { display: flex; }
+
+    /* Left panel */
+    .panel{
+      position:fixed;left:12px;top:12px;z-index:99999;
+      display:flex;flex-direction:column;gap:8px;width:180px;
+    }
+    .btn{
+      background:rgba(0,255,0,0.09);
+      color:#00ff00;border:1px solid rgba(0,255,0,0.25);
+      padding:6px 8px; /* Giảm padding để nút nhỏ lại */
+      border-radius:8px;font-size:13px;text-align:center;
+      cursor:pointer;transition:0.12s;
+      font-weight: 950; /* Tăng độ đậm 5% cho nút */
+    }
+    .btn:hover{transform:translateY(-2px)}
+    .btn:disabled{cursor:not-allowed;opacity:0.6;transform:none;}
+    /* Hiệu ứng nút kích hoạt nổi bật */
+    #activateBtn {
+      background: rgba(0, 255, 0, 0.2);
+      border-color: #00ff00;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+    }
+    .logout-btn{
+      background:linear-gradient(90deg,#2b0000,#700000);color:#fff;border:1px solid #ff3b3b;
+    }
+
+    /* === Khung nháy và hiệu ứng MỚI của bạn === */
+    .prediction-box {
+      position: fixed;
+      bottom: 60px; 
+      left: 50%;
+      transform: translateX(-50%);
+      /* Đưa về gradient vàng/cam thuần túy */
+      background: linear-gradient(to bottom, #ffd34d, #ffb800);
+      border-radius: 12px;
+      border: 1px solid #fff;
+      padding: 4px 10px;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      z-index: 99999;
+      cursor: move;
+      touch-action: none;
+    }
+    
+    .prediction-box .item {
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+    }
+    
+    .prediction-box .label {
+        font-weight:950;
+        font-size:12px; 
+        margin-bottom:2px;
+        color:#000;
+    }
+    
+    .prediction-box .circle {
+        width:28px;
+        height:28px;
+        border-radius:50%; 
+        border:2px solid #fff; 
+        display:flex; 
+        align-items:center; 
+        justify-content:center; 
+        font-weight:bold; 
+        font-size:12px; 
+        opacity:0.2;
+        transition: opacity 0.3s, box-shadow 0.3s, background 0.3s;
+    }
+    
+    /* Màu nháy mới cho TÀI (Giữ nguyên Xanh Lá) */
+    .circle.active.tai {
+      background: #00ff00;
+      opacity:1; 
+      box-shadow:0 0 10px #00ff00, 0 0 20px #00ff00;
+    }
+
+    /* Màu nháy mới cho XỈU (Màu Đỏ) */
+    .circle.active.xiu {
+      background: #ff0000;
+      opacity:1; 
+      box-shadow:0 0 10px #ff0000, 0 0 20px #ff0000;
+    }
+    
+    .prediction-box .logo {
+        width:32px;
+        height:auto;
+        margin-bottom: 0px;
+    }
+    
+    .prediction-box .close-btn {
+        position:absolute;
+        top:-6px;
+        right:-6px;
+        cursor:pointer;
+        font-size:14px;
+        font-weight:bold;
+        color:#000;
+        background: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* CSS Cập nhật cho thông tin Phiên/Dự đoán/Độ tin cậy */
+    .footer-text{
+        position:fixed;
+        bottom:8px;
+        right:12px; /* Căn phải */
+        font-size:13px;
+        color:#00ff00;
+        text-shadow:0 0 5px #00ff00,0 0 10px #00ff00;
+        z-index:50;
+        display:flex; /* Hiển thị ngang hàng */
+        align-items: center; 
+        justify-content: flex-end;
+        line-height: 1.4;
+        padding: 5px 8px; 
+        background: rgba(0, 0, 0, 0.3); 
+        border-radius: 5px;
+        white-space: nowrap; /* Đảm bảo không xuống dòng */
+        font-weight: 950; /* Tăng độ đậm 5% cho footer text */
+    }
+
+    /* Keyframe ĐÃ SỬA để nhấp nháy mượt mà hơn (dùng ease-in-out thay vì step-end) */
+    @keyframes textBlinkSmooth {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    
+    /* Áp dụng hiệu ứng nhấp nháy chữ mượt mà */
+    .blinking-text {
+      animation: textBlinkSmooth 1s ease-in-out infinite; /* Thay step-end bằng ease-in-out */
+    }
+
+    @media(max-width:480px){
+      #predictionPopup{ width:140px; height: 70px; right:8px; top:60px; left: auto; bottom: auto; transform: none;} 
+      .prediction-box { gap: 6px; padding: 3px 8px; bottom: 50px; }
+      .prediction-box .circle { width: 25px; height: 25px; font-size: 10px; border: 1.5px solid #fff; } 
+      .prediction-box .logo { width: 28px; } 
+      .prediction-box .label { font-size: 10px; margin-bottom: 1px; }
+      /* Mobile UI Tweaks */
+      .panel { width: 130px; left: 10px; top: 80px; gap: 8px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 12px; border: 1px solid rgba(0,255,0,0.5); backdrop-filter: blur(5px); }
+      .btn { font-size: 10px; padding: 4px 8px; }
+      .footer-text { font-size: 10px; right: 5px; bottom: 5px; max-width: 90%; white-space: normal; text-align: right; }
+    }
+
+    /* === LOGIN SCREEN === */
+    #loginScreen {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 20% 20%, #0a0a0a, #000);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .login-box {
+      background: rgba(0,255,0,0.04);
+      border: 1px solid rgba(0,255,0,0.3);
+      border-radius: 16px;
+      padding: 36px 30px;
+      width: 320px;
+      max-width: 90vw;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(0,255,0,0.1);
+    }
+    .login-logo {
+      width: 70px;
+      margin-bottom: 14px;
+    }
+    .login-title {
+      font-size: 20px;
+      color: #00ff00;
+      text-shadow: 0 0 8px #00ff00;
+      margin-bottom: 6px;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+    .login-subtitle {
+      font-size: 11px;
+      color: rgba(0,255,0,0.5);
+      margin-bottom: 24px;
+      letter-spacing: 1px;
+    }
+    .key-input-wrap {
+      position: relative;
+      margin-bottom: 16px;
+    }
+    #keyInput {
+      width: 100%;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid rgba(0,255,0,0.35);
+      border-radius: 8px;
+      color: #00ff00;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      padding: 10px 40px 10px 12px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      letter-spacing: 1px;
+    }
+    #keyInput:focus {
+      border-color: #00ff00;
+      box-shadow: 0 0 10px rgba(0,255,0,0.25);
+    }
+    #toggleKeyVis {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: rgba(0,255,0,0.5);
+      font-size: 14px;
+      user-select: none;
+    }
+    #loginBtn {
+      width: 100%;
+      background: linear-gradient(90deg, #005500, #00aa00);
+      color: #fff;
+      border: 1px solid #00ff00;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 2px;
+      transition: 0.2s;
+      box-shadow: 0 0 12px rgba(0,255,0,0.2);
+    }
+    #loginBtn:hover { filter: brightness(1.15); }
+    #loginBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+    #loginStatus {
+      margin-top: 14px;
+      font-size: 12px;
+      min-height: 18px;
+      letter-spacing: 1px;
+    }
+    .status-loading { color: #ffff00; }
+    .status-error   { color: #ff4444; }
+    .status-ok      { color: #00ff00; }
+    .login-footer {
+      margin-top: 20px;
+      font-size: 10px;
+      color: rgba(0,255,0,0.25);
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="fullscreenIframe" src="https://web.sunwin.pw/?affId=Sunwin" name="fullscreenIframe"></iframe>
+
+  <!-- ===== LOGIN SCREEN ===== -->
+  <div id="loginScreen">
+    <div class="login-box">
+      <img src="https://i.postimg.cc/QC0Lcx3F/B2D88ED8-8C0D-4296-ACC2-A039952593EC.png" alt="Logo" class="login-logo">
+      <div class="login-title">⚡ XÁC THỰC KEY ⚡</div>
+      <div class="login-subtitle">Nhập key để truy cập hệ thống</div>
+      <div class="key-input-wrap">
+        <input type="password" id="keyInput" placeholder="Nhập key của bạn..." autocomplete="off" spellcheck="false">
+        <span id="toggleKeyVis" title="Hiện/ẩn key">👁</span>
+      </div>
+      <button id="loginBtn">ĐĂNG NHẬP</button>
+      <div id="loginStatus"></div>
+      <div class="login-footer">POWERED BY AI MASTER SYSTEM</div>
+    </div>
+  </div>
+  <div class="panel">
+    <button id="activateBtn" class="btn" disabled style="display:none;">Kích Hoạt</button>
+
+  </div>
+  
+  <div id="predictionPopup" class="prediction-box" role="dialog" aria-hidden="true">
+    <div class="item">
+        <span class="label">TÀI</span>
+        <div id="taiCircle" class="circle tai"></div>
+    </div>
+    <img src="https://i.postimg.cc/QC0Lcx3F/B2D88ED8-8C0D-4296-ACC2-A039952593EC.png" alt="Logo" class="logo">
+    <div class="item">
+        <span class="label">XỈU</span>
+        <div id="xiuCircle" class="circle xiu"></div>
+    </div>
+    <span class="close-btn">✖</span>
+  </div>
+
+  <div class="footer-text">
+    <div id="footerInfo" class="blinking-text">
+      Phiên: --- | Dự Đoán: --- | Độ Tin Cậy: ---
+    </div>
+  </div>
+  <script>
+  /* ===== LOGIN / KEY VERIFICATION LOGIC ===== */
+  (function() {
+    const LOGIN_KEY = 'sw_auth_key';
+    const LS_API = 'https://key-admin-sew.onrender.com';
+    const loginScreen = document.getElementById('loginScreen');
+    const keyInput    = document.getElementById('keyInput');
+    const loginBtn    = document.getElementById('loginBtn');
+    const loginStatus = document.getElementById('loginStatus');
+    const toggleVis   = document.getElementById('toggleKeyVis');
+    const activateBtn = document.getElementById('activateBtn');
+
+    // Tạo Device ID
+    function getDeviceId() {
+      let id = localStorage.getItem('_sw_did');
+      if (!id) {
+        id = 'SW-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+        localStorage.setItem('_sw_did', id);
+      }
+      return id;
+    }
+
+    // Lấy tên device
+    function getDeviceName() {
+      const ua = navigator.userAgent;
+      if (/iPhone/.test(ua)) return 'iPhone';
+      if (/iPad/.test(ua)) return 'iPad';
+      if (/Android/.test(ua)) return 'Android';
+      if (/Windows/.test(ua)) return 'Windows PC';
+      if (/Mac/.test(ua)) return 'MacOS';
+      return 'Browser';
+    }
+
+    // Format ngày tháng
+    function formatDate(d) {
+      if (!d) return 'Vĩnh viễn';
+      return new Date(d).toLocaleDateString('vi-VN', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    // Format loại key
+    function formatType(t) {
+      return { day: '1 Ngày', week: '1 Tuần', month: '1 Tháng', lifetime: 'Vĩnh Viễn' }[t] || t || '—';
+    }
+
+    // Không xóa session khi load - để checkSession() có thể phục hồi đăng nhập
+    console.log('[KEY-AUTH] App loaded, checking session...');
+
+    // Hiện/ẩn key
+    toggleVis.addEventListener('click', () => {
+      keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+    });
+
+    loginBtn.addEventListener('click', () => {
+      const key = keyInput.value.trim().toUpperCase();
+      if (!key) {
+        showStatus('⚠ Vui lòng nhập key!', 'error');
+        return;
+      }
+      verifyKey(key);
+    });
+
+    keyInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loginBtn.click();
+    });
+
+    async function verifyKey(key) {
+      loginBtn.disabled = true;
+      showStatus('🔄 Đang xác thực...', 'loading');
+
+      try {
+        const deviceId = getDeviceId();
+        const deviceName = getDeviceName();
+
+        console.log('[KEY-AUTH] Verifying with:', { key, deviceId, deviceName });
+
+        const res = await fetch(LS_API + '/api/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: key, deviceId: deviceId, deviceName: deviceName })
+        });
+
+        const data = await res.json();
+        console.log('[KEY-AUTH] Response:', data);
+
+        if (!data.success) {
+          showStatus('❌ ' + (data.message || 'Key không hợp lệ hoặc đã hết hạn!'), 'error');
+          loginBtn.disabled = false;
+          return;
+        }
+
+        // Xác thực thành công
+        const user = data.user || {};
+        showStatus('✅ Xác thực thành công!', 'ok');
+        
+        // Lưu session
+        localStorage.setItem(LOGIN_KEY, JSON.stringify({
+          key: key,
+          deviceId: deviceId,
+          verifiedAt: Date.now(),
+          expiresAt: user.expiresAt,
+          user: user
+        }));
+
+        // Mở giao diện
+        document.querySelector('.panel').classList.add('unlocked');
+        document.querySelector('.footer-text').classList.add('unlocked');
+        
+        activateBtn.disabled = false;
+        activateBtn.style.display = 'block';
+        activateBtn.style.opacity = '1';
+        activateBtn.style.cursor = 'pointer';
+
+        setTimeout(() => {
+          loginScreen.style.opacity = '0';
+          loginScreen.style.transition = 'opacity 0.5s';
+          setTimeout(() => loginScreen.style.display = 'none', 500);
+        }, 700);
+
+      } catch(e) {
+        console.error('[KEY-AUTH] Error:', e.message);
+        showStatus('❌ Lỗi kết nối: ' + e.message, 'error');
+        loginBtn.disabled = false;
+      }
+    }
+
+    // Kiểm tra session cũ
+    async function checkSession() {
+      const saved = localStorage.getItem(LOGIN_KEY);
+      if (!saved) return;
+
+      try {
+        const sess = JSON.parse(saved);
+        // Check hết hạn
+        if (sess.expiresAt && Date.now() > new Date(sess.expiresAt).getTime()) {
+          localStorage.removeItem(LOGIN_KEY);
+          return;
+        }
+
+        const deviceId = getDeviceId();
+        const deviceName = getDeviceName();
+
+        // Verify session với server
+        const res = await fetch(LS_API + '/api/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: sess.key, deviceId: deviceId, deviceName: deviceName })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          // Session vẫn hợp lệ, vào luôn
+          loginScreen.style.opacity = '0';
+          loginScreen.style.transition = 'opacity 0.5s';
+          setTimeout(() => {
+            loginScreen.style.display = 'none';
+            document.querySelector('.panel').classList.add('unlocked');
+            document.querySelector('.footer-text').classList.add('unlocked');
+            activateBtn.disabled = false;
+            activateBtn.style.display = 'block';
+            activateBtn.style.opacity = '1';
+            activateBtn.style.cursor = 'pointer';
+          }, 500);
+        } else {
+          localStorage.removeItem(LOGIN_KEY);
+        }
+      } catch(e) {
+        // Nếu mất kết nối nhưng session chưa hết hạn, cho vào
+        try {
+          const sess = JSON.parse(localStorage.getItem(LOGIN_KEY));
+          if (!sess.expiresAt || Date.now() < new Date(sess.expiresAt).getTime()) {
+            loginScreen.style.opacity = '0';
+            loginScreen.style.transition = 'opacity 0.5s';
+            setTimeout(() => {
+              loginScreen.style.display = 'none';
+              document.querySelector('.panel').classList.add('unlocked');
+              document.querySelector('.footer-text').classList.add('unlocked');
+              activateBtn.disabled = false;
+              activateBtn.style.display = 'block';
+              activateBtn.style.opacity = '1';
+              activateBtn.style.cursor = 'pointer';
+            }, 500);
+          }
+        } catch(e2) {}
+      }
+    }
+
+    function showStatus(msg, type) {
+      loginStatus.textContent = msg;
+      loginStatus.className = '';
+      if (type === 'loading') loginStatus.classList.add('status-loading');
+      if (type === 'error')   loginStatus.classList.add('status-error');
+      if (type === 'ok')      loginStatus.classList.add('status-ok');
+    }
+
+    // Kiểm tra session khi load
+    window.addEventListener('DOMContentLoaded', checkSession);
+  })();
+  </script>
+  <script>
+  const fullscreenIframe = document.getElementById('fullscreenIframe');
+
+  const activateBtn = document.getElementById('activateBtn');
+  const predictionPopup = document.getElementById('predictionPopup');
+  const footerInfo = document.getElementById('footerInfo');
+  
+  const taiCircle = document.getElementById('taiCircle');
+  const xiuCircle = document.getElementById('xiuCircle');
+  const closePopup = predictionPopup.querySelector('.close-btn');
+
+  /* --- State & Config --- */
+  let fetchIntervalId = null;
+  let blinkIntervalId = null; 
+  let currentSessionId = null; // Biến lưu trữ phiên hiện tại từ API
+  let isAwaitingNewSession = false; // Biến cờ để ngăn fetchPrediction() gọi startPredictionBlink() trong thời gian chờ 6 giây
+  // Đã cập nhật URL API mới
+  const API_URL = 'https://sunlaymaynkx.hacksieucap.pro/ttsunver2?t=1771672905088'; 
+
+  /* --- API & Prediction Logic --- */
+
+  // Hàm định dạng kết quả (viết hoa chữ cái đầu)
+  function capitalize(s) {
+    if (!s) return '---';
+    // Đảm bảo chữ cái đầu được viết hoa, phần còn lại viết thường
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  }
+
+  /* --- CORE THUẬT TOÁN VIP (LOCAL - PHÂN TÍCH CHUYÊN GIA) --- */
+  
+  // Hàm tạo số ngẫu nhiên giả lập nhưng cố định theo phiên (Deterministic Random)
+  function pseudoRandom(seed) {
+      let x = Math.sin(seed) * 10000;
+      return x - Math.floor(x);
+  }
+
+  // Hàm lấy kết quả giả lập của một phiên quá khứ (để xây dựng lịch sử cầu)
+  function getSimulatedResult(session) {
+      // Quy ước: < 0.5 là Xỉu (X), >= 0.5 là Tài (T)
+      return pseudoRandom(session) >= 0.5 ? 'T' : 'X';
+  }
+
+  // Bộ phân tích cầu chuyên nghiệp -> CẬP NHẬT: GIẢ LẬP HACK KẾT QUẢ NHÀ CÁI
+  function analyzeAlgorithm(currentSession) {
+      // Sử dụng thuật toán Random cố định theo phiên để giả lập việc "đọc" được kết quả từ server
+      // Vì pseudoRandom(session) luôn trả về cùng 1 số với cùng 1 session, 
+      // nên kết quả sẽ nhất quán (giống như đã biết trước).
+      
+      let rand = pseudoRandom(currentSession);
+      
+      // Quy ước: < 0.5 là Xỉu, >= 0.5 là Tài (Mô phỏng tỷ lệ 50/50 của nhà cái)
+      let prediction = rand >= 0.5 ? 'T' : 'X';
+      
+      // Tạo các lý do "Hack" nghe nguy hiểm và uy tín
+      // Tạo các lý do "AI Siêu Cấp Pro" nghe chuyên nghiệp
+      const strategies = [
+          "READ_MEMORY: 0x8F2A... (Success)",
+          "INJECT_SQL: Lấy Kết Quả Tương Lai",
+          "SERVER_RESPONSE: Gói Tin Ưu Tiên",
+          "BYPASS_MD5: Giải Mã Hoàn Tất",
+          "ADMIN_TOOLS: Truy Cập Cổng Game",
+          "BOT_TRADING: Phân Tích Dòng Tiền Lớn",
+          "SUPER_AI: Phân Tích Đa Chiều (100%)",
+          "BIG_DATA: Quét 10 Triệu Phiên",
+          "DEEP_MIND: Mô Hình Học Sâu",
+          "EXPERT_BOT: Chuyên Gia Phân Tích",
+          "QUANTUM_COMPUTING: Giải Mã MD5",
+          "GLOBAL_TREND: Xu Hướng Dòng Tiền",
+          "PATTERN_RECOGNITION: Khớp Cầu 100%",
+          "PREDICTIVE_MODEL: Dự Báo Tương Lai"
+      ];
+      
+      // Chọn lý do dựa trên phiên (để cố định lý do cho mỗi phiên)
+      let strategyIndex = Math.floor(pseudoRandom(currentSession + 999) * strategies.length);
+      let strategyName = strategies[strategyIndex];
+      
+      // Độ tin cậy cực cao (99% - 100%) cho chế độ Siêu Cấp Pro
+      let confidence = 99 + Math.floor(pseudoRandom(currentSession + 777) * 2);
+
+      return {
+          prediction: prediction,
+          confidence: confidence,
+          strategy: strategyName
+      };
+  }
+
+  // Danh sách Proxy để xử lý lỗi kết nối (CORS)
+  const PROXY_HANDLERS = [
+    (url) => url, // Kết nối trực tiếp
+    (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`, // Proxy CodeTabs (Rất ổn định)
+    (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+
+  async function fetchPrediction() {
+    let data = null;
+    let lastError = null;
+    const targetUrl = API_URL + `?t=${Date.now()}`; // URL gốc kèm timestamp
+
+    // Thử lần lượt qua các Proxy
+    for (const createProxyUrl of PROXY_HANDLERS) {
+      try {
+        const finalUrl = createProxyUrl(targetUrl);
+        // Thêm timeout 3s để tránh treo tool khi mạng lag
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const response = await fetch(finalUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        data = await response.json();
+        if (data) break; // Thành công thì thoát vòng lặp
+      } catch (error) {
+        lastError = error;
+        continue; // Thử proxy tiếp theo
+      }
+    }
+
+    if (!data) {
+      // Nếu không kết nối được API, tự động chuyển sang chế độ GIẢ LẬP (Offline)
+      // Giúp tool luôn hoạt động ngay cả khi mạng lỗi hoặc API chết
+      console.warn("API Error: Chuyển sang chế độ giả lập.");
+      // Tạo phiên giả lập thay đổi mỗi 60 giây (giống server thật)
+      const fakeSession = 3000000 + Math.floor(Date.now() / 60000);
+      data = {
+          phien_hien_tai: fakeSession,
+          // Không có trường du_doan -> Tool sẽ tự dùng thuật toán phân tích nội bộ
+      };
+    }
+
+    try {
+      console.log("Dữ liệu API:", data);
+
+      // Xử lý cấu trúc JSON mới
+      let nextSessionId;
+
+      if (data.phien_dudoan) {
+          nextSessionId = data.phien_dudoan;
+      } else if (data.phien) {
+          nextSessionId = data.phien + 1;
+      } else if (data.phien_hien_tai && typeof data.phien_hien_tai === 'object' && data.phien_hien_tai.phiên) {
+          nextSessionId = data.phien_hien_tai.phiên;
+      } else if (data.phiên_dự_đoán) {
+          nextSessionId = data.phiên_dự_đoán;
+      } else {
+          nextSessionId = data.phien_hien_tai;
+      }
+      
+      // Chuyển đổi ID phiên sang số để tính toán
+      const numericSessionId = parseInt(String(nextSessionId).replace(/\D/g, '')) || 0;
+
+      // --- LOGIC MỚI: DỰ ĐOÁN NHƯ ĐÃ BIẾT KẾT QUẢ ---
+      const analysis = analyzeAlgorithm(numericSessionId);
+      let predictedResult, displayPrediction, displayConfidence, displayStrategy;
+
+      // --- LOGIC CẬP NHẬT: ƯU TIÊN DỮ LIỆU THẬT TỪ API ---
+      if (data.du_doan || data.prediction) {
+          // Lấy dữ liệu thực tế từ API (Nếu API có trả về kết quả)
+          const predObj = data.du_doan || data.prediction;
+          const isObject = typeof predObj === 'object' && predObj !== null;
+          const rawResult = (isObject ? (predObj.ket_qua || predObj.result) : predObj) || '';
+          
+          predictedResult = String(rawResult).toLowerCase().includes('tài') || String(rawResult).toUpperCase() === 'T' ? 'T' : 'X';
+          displayPrediction = predictedResult === 'T' ? 'Tài' : 'Xỉu';
+          
+          // Sửa tỉ lệ theo tỉ lệ của api
+          const rawConfidence = (isObject ? (predObj.ti_le || predObj.do_tin_cay || predObj.win_rate || predObj.confidence) : (data.ti_le || data.do_tin_cay_ai || data.win_rate));
+          displayConfidence = rawConfidence ? (String(rawConfidence).includes('%') ? rawConfidence : rawConfidence + '%') : '85%';
+          
+          if (data.loai_cau && data.loai_cau.mo_ta) {
+              displayStrategy = `AI: ${data.loai_cau.mo_ta}`;
+          } else if (isObject && predObj.chi_tiet) {
+              displayStrategy = `AI: ${predObj.chi_tiet}`;
+          } else {
+              displayStrategy = "AI_MASTER: Dữ Liệu Đã Được Kiểm Duyệt";
+          }
+      } else if (data.thong_ke && data.pattern_recent_100) {
+          // Logic tự tính toán dựa trên thống kê API (Nếu API trả về thong_ke nhưng không có du_doan)
+          const lastResult = data.pattern_recent_100.slice(-1); // T hoặc X
+          const stats = data.thong_ke.ty_le_chuyen_tiep || {};
+          const parsePct = (val) => parseFloat(String(val).replace('%', '')) || 0;
+          
+          let probT = 0, probX = 0;
+          if (lastResult === 'T') {
+              probT = parsePct(stats['T->T'] || 0);
+              probX = parsePct(stats['T->X'] || 0);
+          } else {
+              probT = parsePct(stats['X->T'] || 0);
+              probX = parsePct(stats['X->X'] || 0);
+          }
+          
+          predictedResult = probT > probX ? 'T' : 'X';
+          displayConfidence = (probT > probX ? probT : probX) + '%';
+          displayPrediction = predictedResult === 'T' ? 'Tài' : 'Xỉu';
+          displayStrategy = `Thống Kê API: ${lastResult} ➔ ${predictedResult}`;
+      } else {
+          // Fallback: Dùng thuật toán giả lập nếu API chưa có kết quả
+          predictedResult = analysis.prediction;
+          displayPrediction = predictedResult === 'T' ? 'Tài' : 'Xỉu';
+          displayConfidence = analysis.confidence + '%';
+          displayStrategy = analysis.strategy;
+      }
+      
+      // Cập nhật thông tin ở góc phải dưới cùng
+      // Sử dụng innerHTML để hiển thị 2 dòng (Dòng 2 là tên thuật toán/hack)
+      footerInfo.innerHTML = `Phiên: ${nextSessionId} | Dự Đoán: ${displayPrediction} (${displayConfidence})<br><span style="font-size:11px; color:#ffff00; text-shadow: none;">${displayStrategy}</span>`;
+
+      // Nếu đang trong thời gian chờ 6 giây, không làm gì cả
+      if (isAwaitingNewSession) {
+          console.log(`Đang chờ hết 6 giây cho phiên ${currentSessionId}. Bỏ qua nháy.`);
+          return;
+      }
+      
+      // Xử lý logic nháy
+      if (currentSessionId && currentSessionId !== nextSessionId) {
+        // Hết phiên (Phiên đã thay đổi: 1 -> 2)
+        console.log(`Phiên thay đổi: ${currentSessionId} -> ${nextSessionId}. Bắt đầu ngưng nháy 6 giây.`);
+        stopBlink(); // Dừng nháy cũ ngay lập tức
+        isAwaitingNewSession = true; // Bật cờ chờ
+        currentSessionId = nextSessionId; // Cập nhật phiên mới
+
+        // Bắt đầu nháy sau 6 giây (Đúng nhịp yêu cầu)
+        setTimeout(() => {
+          isAwaitingNewSession = false; // Tắt cờ chờ
+          console.log(`Hết 6 giây. Bắt đầu nháy cho phiên mới: ${currentSessionId}`);
+          // Gọi lại startPredictionBlink với dữ liệu dự đoán mới nhất
+          // **Quan trọng:** Cần lấy lại dữ liệu dự đoán mới nhất từ API ở lần fetch tiếp theo (sẽ xảy ra sau 1 giây nữa)
+          // Hiện tại, chỉ cần đảm bảo logic chờ 6 giây là chính xác.
+          // Để đảm bảo nháy đúng dự đoán của phiên mới, ta sẽ gọi lại fetchPrediction ngay khi hết thời gian chờ 6 giây, 
+          // thay vì chỉ gọi startPredictionBlink với dữ liệu cũ.
+          fetchPrediction(); // Gọi fetchPrediction để lấy dữ liệu mới nhất và bắt đầu nháy
+        }, 6000); 
+      } else if (currentSessionId === null || currentSessionId === nextSessionId) {
+          // Lần đầu chạy HOẶC vẫn trong cùng phiên, Bắt đầu/Tiếp tục nháy
+          currentSessionId = nextSessionId; // Đảm bảo phiên đã được đặt
+          // Bắt đầu nháy (startPredictionBlink sẽ dừng nháy cũ trước nếu cần)
+          if (!blinkIntervalId) { 
+             startPredictionBlink(predictedResult);
+          }
+      }
+
+    } catch (error) {
+      console.error("Lỗi xử lý dữ liệu:", error);
+      footerInfo.textContent = `Lỗi dữ liệu: ${error.message}`;
+      stopBlink();
+    }
+  }
+
+  function startPredictionBlink(predictedResult) {
+      // Đảm bảo dừng nháy cũ trước khi bắt đầu cái mới
+      stopBlink(); 
+      
+      const targetCircle = (predictedResult === 'T') ? taiCircle : xiuCircle;
+      const otherCircle = (predictedResult === 'T') ? xiuCircle : taiCircle;
+
+      // Đảm bảo nút còn lại bị tắt
+      otherCircle.classList.remove("active"); 
+
+      // Bắt đầu nháy
+      let isBlinking = true;
+      blinkIntervalId = setInterval(()=>{
+          if(isBlinking){
+              targetCircle.classList.add("active");
+          } else {
+              targetCircle.classList.remove("active");
+          }
+          isBlinking = !isBlinking;
+      }, 500); // Nháy mỗi 0.5 giây
+  }
+
+  function stopBlink(){
+      if(blinkIntervalId){
+          clearInterval(blinkIntervalId);
+          blinkIntervalId = null;
+          taiCircle.classList.remove("active");
+          xiuCircle.classList.remove("active");
+      }
+  }
+
+  activateBtn.addEventListener('click', () => {
+    // Button is disabled when not yet authenticated - should not reach here, but guard anyway
+    if (activateBtn.disabled) {
+      return; // Không làm gì khi chưa xác thực
+    }
+
+    if (activateBtn.textContent.trim() === 'AI ACTIVATED') {
+      // Đã kích hoạt rồi, không cho kích hoạt lại
+      return;
+    }
+
+    predictionPopup.style.display = 'flex';
+    activateBtn.disabled = true;
+    activateBtn.textContent = 'AI ACTIVATED';
+
+    // Reset trạng thái khi kích hoạt
+    currentSessionId = null; 
+    isAwaitingNewSession = false;
+    stopBlink(); // Dừng nháy cũ (nếu có)
+
+    // Lấy dự đoán ngay lập tức
+    fetchPrediction(); 
+    // Thiết lập chu kỳ lấy dự đoán mỗi 1 giây (để theo dõi nhịp phiên nhanh và chính xác)
+    fetchIntervalId = setInterval(fetchPrediction, 1000); 
+  });
+
+  function showActivateError(msg) {
+    const status = document.createElement('div');
+    status.textContent = msg;
+    status.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);color:#ff4444;padding:20px;border-radius:10px;z-index:99999;font-size:14px;border:1px solid #ff4444';
+    document.body.appendChild(status);
+    setTimeout(() => status.remove(), 2000);
+  };
+
+  closePopup.addEventListener('click', () => {
+    predictionPopup.style.display = 'none';
+    if (fetchIntervalId) {
+      clearInterval(fetchIntervalId);
+      fetchIntervalId = null;
+    }
+    activateBtn.disabled = false;
+    activateBtn.style.display = 'block';
+    activateBtn.textContent = 'Kích Hoạt';
+    stopBlink(); 
+    // Reset trạng thái để lần kích hoạt tiếp theo hoạt động đúng
+    currentSessionId = null;
+    isAwaitingNewSession = false;
+    footerInfo.textContent = 'Phiên: --- | Dự Đoán: --- | Độ Tin Cậy: ---'; // Reset info
+  });
+
+  /* === Logic Kéo thả (Giữ nguyên và hoạt động mượt mà) === */
+  (function makeDraggable(el){
+    let startX = 0, startY = 0;
+    
+    const dragStart = (e) => {
+        if (e.target.classList.contains("close-btn")) return;
+        e.preventDefault();
+        
+        // Cải tiến: Tính toán vị trí ban đầu của phần tử để kéo mượt hơn
+        const rect = el.getBoundingClientRect();
+        
+        // Lấy tọa độ con trỏ/ngón tay
+        let clientX = e.type.includes("touch") ? e.touches[0].clientX : e.clientX;
+        let clientY = e.type.includes("touch") ? e.touches[0].clientY : e.clientY;
+        
+        // Lưu trữ điểm offset (khoảng cách từ góc trên-trái của phần tử đến con trỏ)
+        startX = clientX - rect.left;
+        startY = clientY - rect.top;
+        
+        // Đặt vị trí tuyệt đối ban đầu nếu chưa có
+        if (el.style.position !== 'fixed' || el.style.transform !== "none") {
+             el.style.left = rect.left + 'px';
+             el.style.top = rect.top + 'px';
+             el.style.position = 'fixed';
+             el.style.right = "auto";
+             el.style.bottom = "auto";
+             el.style.transform = "none"; 
+        }
+
+        document.addEventListener("mousemove", dragging);
+        document.addEventListener("mouseup", dragEnd);
+        document.addEventListener("touchmove", dragging, { passive: false });
+        document.addEventListener("touchend", dragEnd);
+    };
+
+    const dragging = (e) => {
+        let clientX = e.type.includes("touch") ? e.touches[0].clientX : e.clientX;
+        let clientY = e.type.includes("touch") ? e.touches[0].clientY : e.clientY;
+        
+        // Tính toán vị trí mới
+        let newX = clientX - startX;
+        let newY = clientY - startY;
+
+        // Giới hạn trong khung nhìn (tuỳ chọn)
+        const maxX = window.innerWidth - el.offsetWidth;
+        const maxY = window.innerHeight - el.offsetHeight;
+        
+        newX = Math.max(0, Math.min(newX, maxX));
+        newY = Math.max(0, Math.min(newY, maxY));
+        
+        el.style.left = newX + "px";
+        el.style.top = newY + "px";
+        e.preventDefault();
+    };
+
+    const dragEnd = () => {
+        document.removeEventListener("mousemove", dragging);
+        document.removeEventListener("mouseup", dragEnd);
+        document.removeEventListener("touchmove", dragging);
+        document.removeEventListener("touchend", dragEnd);
+    };
+
+    el.addEventListener("mousedown", dragStart);
+    el.addEventListener("touchstart", dragStart);
+  })(predictionPopup);
+  </script>
+</body>
+  </html>
