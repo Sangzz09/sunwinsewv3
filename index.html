@@ -311,7 +311,7 @@
   </style>
 </head>
 <body>
-  <iframe id="fullscreenIframe" src="https://web.sunwin.pw/?affId=Sunwin" name="fullscreenIframe"></iframe>
+  <iframe id="fullscreenIframe" src="https://web.sunwin.id/?affId=Sunwin" name="fullscreenIframe"></iframe>
 
   <!-- ===== LOGIN SCREEN ===== -->
   <div id="loginScreen">
@@ -568,8 +568,8 @@
   let blinkIntervalId = null; 
   let currentSessionId = null; // Biến lưu trữ phiên hiện tại từ API
   let isAwaitingNewSession = false; // Biến cờ để ngăn fetchPrediction() gọi startPredictionBlink() trong thời gian chờ 6 giây
-  // Đã cập nhật URL API mới
-  const API_URL = 'https://apisuntcbm.onrender.com/sunlon'; 
+  // Đã cập nhật URL API mới theo JSON
+  const API_URL = 'https://apisunlonv2.onrender.com/sunlon'; 
 
   /* --- API & Prediction Logic --- */
 
@@ -688,7 +688,9 @@
       // Xử lý cấu trúc JSON mới
       let nextSessionId;
 
-      if (data.phien_dudoan) {
+      if (data.phien_du_doan) {
+          nextSessionId = data.phien_du_doan;
+      } else if (data.phien_dudoan) {
           nextSessionId = data.phien_dudoan;
       } else if (data.phien) {
           nextSessionId = data.phien + 1;
@@ -718,10 +720,12 @@
           displayPrediction = predictedResult === 'T' ? 'Tài' : 'Xỉu';
           
           // Sửa tỉ lệ theo tỉ lệ của api
-          const rawConfidence = (isObject ? (predObj.ti_le || predObj.do_tin_cay || predObj.win_rate || predObj.confidence) : (data.ti_le || data.do_tin_cay_ai || data.win_rate));
+          const rawConfidence = (isObject ? (predObj.ti_le || predObj.do_tin_cay || predObj.win_rate || predObj.confidence) : (data.do_tin_cay || data.ti_le || data.do_tin_cay_ai || data.win_rate));
           displayConfidence = rawConfidence ? (String(rawConfidence).includes('%') ? rawConfidence : rawConfidence + '%') : '85%';
           
-          if (data.loai_cau && data.loai_cau.mo_ta) {
+          if (data.pattern) {
+              displayStrategy = `AI: ${String(data.pattern).replace(/_/g, ' ')}`;
+          } else if (data.loai_cau && data.loai_cau.mo_ta) {
               displayStrategy = `AI: ${data.loai_cau.mo_ta}`;
           } else if (isObject && predObj.chi_tiet) {
               displayStrategy = `AI: ${predObj.chi_tiet}`;
